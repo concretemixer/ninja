@@ -1,4 +1,7 @@
+debug/
+release/
 bin/
 obj/
 tmp/
 *.suo
+*.sdf
