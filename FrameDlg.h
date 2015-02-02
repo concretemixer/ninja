@@ -19,6 +19,8 @@ public:
 	{
 		m_width = w;
 		m_color = color;
+		m_init = false;
+
 		InvalidateRect(0,1);
 	}
 
@@ -29,7 +31,10 @@ protected:
 	int m_width;
 	COLORREF m_color;
 
+	bool m_init;
+
 	DECLARE_MESSAGE_MAP()
 public:
 	afx_msg void OnPaint();
+	afx_msg BOOL OnEraseBkgnd(CDC* pDC);
 };

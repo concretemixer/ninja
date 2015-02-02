@@ -177,6 +177,8 @@ struct TableData {
 	bool folded;
 	unsigned int btnTime;
 	int handNumHash;
+	bool abtn;
+	bool tbtn;
 	CFrameDlg* frame;
 };
 
@@ -350,8 +352,8 @@ void UpdateTableData(HWND h)
 	::GetWindowRect(h, &mainRect);
 
 	bool play = tables[h].playing;	
-	bool abtn = false;
-	bool tbtn = false;
+	tables[h].abtn = false;
+	tables[h].tbtn = false;
 
 	if (play && tables[h].frame && tables[h].frame->m_hWnd!=0) {
 		tables[h].frame->SetTrackedWindow(h);
@@ -407,20 +409,14 @@ void UpdateTableData(HWND h)
 		POINT p;
 		p.x = (r.right * 552) / 1052;
 		p.y = (r.bottom * 725) / 768;		
-		abtn =  IsWindowVisible(ChildWindowFromPointEx(h,p,0));
+		tables[h].abtn =  IsWindowVisible(ChildWindowFromPointEx(h,p,0));
 
 		p;
 		p.x = (r.right * 858) / 1052;
 		p.y = (r.bottom * 666) / 768;		
-		tbtn =  IsWindowVisible(ChildWindowFromPointEx(h,p,0));
+		tables[h].tbtn =  IsWindowVisible(ChildWindowFromPointEx(h,p,0));
 
 	}
-	
-	if (tables[h].frame && tables[h].frame->m_hWnd!=0) {		
-		tables[h].frame->SetFrame(tbtn ? 4 : 2, tbtn ? 0xff : 0xFF00);
-		tables[h].frame->ShowWindow((abtn || tbtn) ? SW_SHOW : SW_HIDE);
-	}
-
 }
 
 void UpdateTableWindow(const TableData& data)
@@ -429,11 +425,11 @@ void UpdateTableWindow(const TableData& data)
 	int alpha = 255;
 	if (data.folded && data.playing && data.btnTime>0) {
 		DWORD t = timeGetTime() - data.btnTime;
-		if (t > 7000)  {
-			if (t > 9000)		
+		if (t > 5000)  {
+			if (t > 6000)		
 				alpha = 160;
 			else {
-				alpha = 255 - (95*(t - 7000))/2000;
+				alpha = 255 - (95*(t - 5000))/1000;
 				if (alpha < 160)
 					alpha = 160;
 			}
@@ -442,7 +438,12 @@ void UpdateTableWindow(const TableData& data)
 	//Log("a = %d",alpha);
 	::SetWindowLong(data.handle, GWL_EXSTYLE, ::GetWindowLong(data.handle, GWL_EXSTYLE) | WS_EX_LAYERED);
 	::SetLayeredWindowAttributes(data.handle, 1, alpha, LWA_ALPHA);	
-	
+
+
+	if (data.frame && data.frame->m_hWnd!=0) {		
+		data.frame->SetFrame(data.tbtn ? 4 : 2, data.tbtn ? 0xff : 0xFF00);
+		data.frame->ShowWindow((data.abtn || data.tbtn) ? SW_SHOW : SW_HIDE);
+	}
 }
 
 HANDLE hThread2;
@@ -503,6 +504,25 @@ void CninjaDlg::OnBnClickedButton1()
 
 void CninjaDlg::OnBnClickedButton2()
 {
-	
+	HWND h = (HWND)0x00360686;
+
+	::PostMessage(h,WM_ENTERSIZEMOVE,0,0);
+	::SetWindowPos(h,0,0,0,587,428,SWP_NOMOVE | SWP_NOZORDER);
+	POINT p;
+
+	p.x = 581;
+	p.y = 402;
+
+	RECT r;
+
+	GetWindowRect(&r);
+
+	int x = r.right-3;
+	int y = r.bottom-3;
+
+	//::PostMessage(h,WM_NCLBUTTONDOWN,17, x	| (y << 16));	
+	//::PostMessage(h,WM_NCLBUTTONUP,17, x	| (y << 16));
+	::PostMessage(h,WM_SIZING,8,(LPARAM)&r);
+	::PostMessage(h,WM_EXITSIZEMOVE,0,0);
 
 }

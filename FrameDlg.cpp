@@ -30,6 +30,7 @@ void CFrameDlg::DoDataExchange(CDataExchange* pDX)
 
 BEGIN_MESSAGE_MAP(CFrameDlg, CDialogEx)
 	ON_WM_PAINT()
+	ON_WM_ERASEBKGND()
 END_MESSAGE_MAP()
 
 
@@ -58,6 +59,12 @@ void CFrameDlg::OnPaint()
 		return;
 	}
 
+	if (!m_init) {
+		::SetWindowLong(m_hWnd, GWL_EXSTYLE, ::GetWindowLong(m_hWnd, GWL_EXSTYLE) | WS_EX_LAYERED);
+		::SetLayeredWindowAttributes(m_hWnd, 1, 255, LWA_COLORKEY);	
+		m_init = true;
+	}
+
 	CPaintDC dc(this); // device context for painting
 
 	CRect r;
@@ -73,7 +80,13 @@ void CFrameDlg::OnPaint()
 
 
 
-	::SetWindowLong(m_hWnd, GWL_EXSTYLE, ::GetWindowLong(m_hWnd, GWL_EXSTYLE) | WS_EX_LAYERED);
-	::SetLayeredWindowAttributes(m_hWnd, 1, 255, LWA_COLORKEY);	
 
+}
+
+
+BOOL CFrameDlg::OnEraseBkgnd(CDC* pDC)
+{
+	// TODO: Add your message handler code here and/or call default
+
+	return TRUE;
 }
