@@ -3,5 +3,8 @@ release/
 bin/
 obj/
 tmp/
+ipch/
 *.suo
 *.sdf
+*.ncb
+*.opensdf
