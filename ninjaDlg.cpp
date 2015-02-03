@@ -179,6 +179,7 @@ struct TableData {
 	int handNumHash;
 	bool abtn;
 	bool tbtn;
+	int  fast;
 	CFrameDlg* frame;
 };
 
@@ -266,21 +267,135 @@ void CheckForFold(HWND h, int x, int y)
 	}	
 }
 
+void CheckForRaise(HWND h, int x, int y)
+{
+	wchar_t buf[256];
+	SendMessageW(h,WM_GETTEXT,256,(LPARAM)buf);
+	if (wcsstr(buf,L"Blinds")) {
+
+		POINT p;
+		RECT r;
+		GetClientRect(h,&r);		
+
+		p.x = x;
+		p.y = y;
+		::ScreenToClient(h,&p);
+
+		HWND hc = ChildWindowFromPointEx(h,p,CWP_SKIPINVISIBLE);
+
+		if (hc == h)
+			return;
+
+		p.x = (r.right * (552+130*2)) / 1052;
+		p.y = (r.bottom * 725) / 768;		
+		HWND hraise = ChildWindowFromPointEx(h,p,CWP_SKIPINVISIBLE);
+
+		if (hraise == hc) {
+
+			p.x = (r.right * 674) / 1052;
+			p.y = (r.bottom * 669) / 768;		
+			PressMouse(h,p);
+
+			Log("Raised %x",h);
+		}
+	}	
+}
+
+void CycleBets(HWND h, int delta)
+{
+	wchar_t buf[256];
+	SendMessageW(h,WM_GETTEXT,256,(LPARAM)buf);
+	if (wcsstr(buf,L"Blinds")) {
+
+		POINT p;
+		RECT r;
+		GetClientRect(h,&r);	
+
+		p.x = (r.right * 552) / 1052;
+		p.y = (r.bottom * 725) / 768;		
+		HWND hfold = ChildWindowFromPointEx(h,p,CWP_SKIPINVISIBLE);
+
+		if (hfold==h)
+			return;
+
+		int i;
+		EnterCriticalSection(&tablesCriticalSection);
+		if (tables[h].fast==-1) {
+			if (delta<0) 
+				tables[h].fast=1;
+			else
+				tables[h].fast=2;
+		}		
+		else {
+			if (delta<0) {
+				tables[h].fast--;
+				if (tables[h].fast<0)
+					tables[h].fast = 0;
+			}
+			else {
+				tables[h].fast++;
+				if (tables[h].fast>3)
+					tables[h].fast = 3;
+			}
+		}
+		i = tables[h].fast;
+		LeaveCriticalSection(&tablesCriticalSection);
+
+
+		Log("Wheel %x, %d",h,delta);
+
+		if (i==0)
+		{
+			p.x = (r.right * (674-78-78-78)) / 1052;
+			p.y = (r.bottom * 669) / 768;		
+		}
+		if (i==1)
+		{
+			p.x = (r.right * (674-78-78)) / 1052;
+			p.y = (r.bottom * 669) / 768;		
+		}
+		if (i==2)
+		{
+			p.x = (r.right * (674-78)) / 1052;
+			p.y = (r.bottom * 669) / 768;		
+		}
+		if (i==3)
+		{
+			p.x = (r.right * 674) / 1052;
+			p.y = (r.bottom * 669) / 768;		
+		}
+
+		PressMouse(h,p);
+
+	}	
+}
+
+
+
 
 HHOOK hMouseHook;
 
 __declspec(dllexport) LRESULT CALLBACK KeyboardEvent (int nCode, WPARAM wParam, LPARAM lParam)
 {
-	MOUSEHOOKSTRUCT * pMouseStruct = (MOUSEHOOKSTRUCT *)lParam;
+	MSLLHOOKSTRUCT * pMouseStruct = (MSLLHOOKSTRUCT *)lParam;
 
 	if (pMouseStruct != NULL) {
 		if (wParam==WM_RBUTTONUP) {
 			HWND h = GetForegroundWindow();
 			SimulatePrefold(h, pMouseStruct->pt.x, pMouseStruct->pt.y);
 		}		
+		if (wParam==WM_LBUTTONDOWN) {
+			HWND h = GetForegroundWindow();
+			//CheckForRaise(h, pMouseStruct->pt.x, pMouseStruct->pt.y);
+		}
 		if (wParam==WM_LBUTTONUP) {
 			HWND h = GetForegroundWindow();
 			CheckForFold(h, pMouseStruct->pt.x, pMouseStruct->pt.y);
+		}
+
+		if (wParam==WM_MOUSEWHEEL) {
+			HWND h = GetForegroundWindow();
+			CycleBets(h, GET_WHEEL_DELTA_WPARAM(pMouseStruct->mouseData));
 		}
 	}
 	return CallNextHookEx(hMouseHook,nCode,wParam,lParam);
@@ -331,6 +446,7 @@ void UpdateTableData(HWND h)
 		t.handNumHash = 0;
 		t.btnTime = 0;
 		t.slot = nextSlot;
+		t.fast = -1;
 		nextSlot++;
 
 		t.frame = &(frames[t.slot]);
@@ -365,6 +481,7 @@ void UpdateTableData(HWND h)
 		Log("New hand %x",h);
 		tables[h].handNumHash = hash;
 		tables[h].folded = false;
+		tables[h].fast = -1;
 	}
 
 	HWND handle = 0;
