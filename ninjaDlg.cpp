@@ -16,6 +16,9 @@
 #endif
 
 bool InitScraper();
+void InitDB();
+void OnNewHand();
+void CloseDB();
 
 // CAboutDlg dialog used for App About
 
@@ -70,6 +73,7 @@ BEGIN_MESSAGE_MAP(CninjaDlg, CDialogEx)
 	ON_WM_QUERYDRAGICON()
 	ON_BN_CLICKED(IDC_BUTTON1, &CninjaDlg::OnBnClickedButton1)
 	ON_BN_CLICKED(IDC_BUTTON2, &CninjaDlg::OnBnClickedButton2)
+	ON_BN_CLICKED(IDC_BUTTON3, &CninjaDlg::OnBnClickedButton3)
 END_MESSAGE_MAP()
 
 
@@ -394,7 +398,9 @@ __declspec(dllexport) LRESULT CALLBACK KeyboardEvent (int nCode, WPARAM wParam, 
 		}
 
 		if (wParam==WM_MOUSEWHEEL) {
-			HWND h = GetForegroundWindow();
+			HWND h = WindowFromPoint(pMouseStruct->pt);
+			while (GetParent(h)!=HWND_DESKTOP)
+				h = GetParent(h);
 			CycleBets(h, GET_WHEEL_DELTA_WPARAM(pMouseStruct->mouseData));
 		}
 	}
@@ -479,6 +485,7 @@ void UpdateTableData(HWND h)
 	int hash = HandHash(h);
 	if (hash!=tables[h].handNumHash) {
 		Log("New hand %x",h);
+		OnNewHand();
 		tables[h].handNumHash = hash;
 		tables[h].folded = false;
 		tables[h].fast = -1;
@@ -600,6 +607,8 @@ void CninjaDlg::OnBnClickedButton1()
 {
 	DWORD dwThread;
 	
+	InitDB();
+
 	for(int a=0;a<20;a++)
 	{
 		frames[a].Create(IDD_FRAMEDIALOG, CWnd::GetDesktopWindow());
@@ -621,25 +630,56 @@ void CninjaDlg::OnBnClickedButton1()
 
 void CninjaDlg::OnBnClickedButton2()
 {
-	HWND h = (HWND)0x00360686;
+	HWND h = (HWND)0x00502022;
 
-	::PostMessage(h,WM_ENTERSIZEMOVE,0,0);
+	::SetForegroundWindow(h);
 	::SetWindowPos(h,0,0,0,587,428,SWP_NOMOVE | SWP_NOZORDER);
+	return;
+	//return;
+	RECT rc;
 	POINT p;
 
-	p.x = 581;
-	p.y = 402;
+	::GetClientRect(h,&rc);
+	p.x = rc.right;
+	p.y = rc.bottom;
 
-	RECT r;
+	::ClientToScreen(h, (POINT*)&p);
 
-	GetWindowRect(&r);
+	p.x = (p.x * 65535) / 1920;
+	p.y = (p.y * 65535) / 1080;
 
-	int x = r.right-3;
-	int y = r.bottom-3;
+	POINT cp;
+	::GetCursorPos(&cp);
 
-	//::PostMessage(h,WM_NCLBUTTONDOWN,17, x	| (y << 16));	
-	//::PostMessage(h,WM_NCLBUTTONUP,17, x	| (y << 16));
-	::PostMessage(h,WM_SIZING,8,(LPARAM)&r);
-	::PostMessage(h,WM_EXITSIZEMOVE,0,0);
+	cp.x = (cp.x * 65535) / 1920;
+	cp.y = (cp.y * 65535) / 1080;
 
+	mouse_event(MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_MOVE, p.x, p.y ,0,0);
+	mouse_event(MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_LEFTDOWN , p.x, p.y ,0,0);
+	mouse_event(MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_LEFTUP, p.x, p.y ,0,0);
+	mouse_event(MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_MOVE, cp.x, cp.y ,0,0);
+
+
+
+}
+
+#include "sqlite/sqlite3.h"
+
+static int callback(void *NotUsed, int argc, char **argv, char **azColName)
+{
+	int i;
+	for(i=0; i<argc; i++){
+		Log("%s = %s\n", azColName[i], argv[i] ? argv[i] : "NULL");
+	}
+	printf("\n");
+	return 0;	 
+}
+
+
+
+void CninjaDlg::OnBnClickedButton3()
+{
+	InitDB();
+	OnNewHand();
+	CloseDB();	
 }
