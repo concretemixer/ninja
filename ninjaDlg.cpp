@@ -375,6 +375,36 @@ void CycleBets(HWND h, int delta)
 }
 
 
+void TranslateWheel(HWND h, int delta)
+{
+	wchar_t buf[256];
+	SendMessageW(h,WM_GETTEXT,256,(LPARAM)buf);
+	if (wcsstr(buf,L"Blinds")) {
+
+		POINT p;
+		RECT r;
+		GetClientRect(h,&r);	
+
+		p.x = (r.right * 552) / 1052;
+		p.y = (r.bottom * 725) / 768;		
+		HWND hfold = ChildWindowFromPointEx(h,p,CWP_SKIPINVISIBLE);
+
+		p.x = (r.right * 779) / 1052;
+		p.y = (r.bottom * 637) / 768;		
+		HWND hslider = ChildWindowFromPointEx(h,p,CWP_SKIPINVISIBLE);
+
+		if (hfold==h  || hslider==h) 
+			return;
+		
+	
+
+		Log("Wheel %x, %d",h,delta);
+
+		SendMessage(hslider,WM_SETFOCUS,(WPARAM)h,0);                     
+		SendMessage(hslider,WM_MOUSEWHEEL,delta,0);
+
+	}	
+}
 
 
 HHOOK hMouseHook;
@@ -401,7 +431,8 @@ __declspec(dllexport) LRESULT CALLBACK KeyboardEvent (int nCode, WPARAM wParam, 
 			HWND h = WindowFromPoint(pMouseStruct->pt);
 			while (GetParent(h)!=HWND_DESKTOP)
 				h = GetParent(h);
-			CycleBets(h, GET_WHEEL_DELTA_WPARAM(pMouseStruct->mouseData));
+			//CycleBets(h, GET_WHEEL_DELTA_WPARAM(pMouseStruct->mouseData));
+			TranslateWheel(h, GET_WHEEL_DELTA_WPARAM(pMouseStruct->mouseData));
 		}
 	}
 	return CallNextHookEx(hMouseHook,nCode,wParam,lParam);
