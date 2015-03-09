@@ -106,6 +106,7 @@
     <ClInclude Include="ninja.h" />
     <ClInclude Include="ninjaDlg.h" />
     <ClInclude Include="Resource.h" />
+    <ClInclude Include="Settings.h" />
     <ClInclude Include="sqlite\sqlite3.h" />
     <ClInclude Include="sqlite\sqlite3ext.h" />
     <ClInclude Include="stdafx.h" />
@@ -117,6 +118,7 @@
     <ClCompile Include="ninja.cpp" />
     <ClCompile Include="ninjaDlg.cpp" />
     <ClCompile Include="scraper.cpp" />
+    <ClCompile Include="Settings.cpp" />
     <ClCompile Include="sqlite\sqlite3.c">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
     </ClCompile>

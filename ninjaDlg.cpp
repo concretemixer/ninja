@@ -4,6 +4,7 @@
 
 #include "stdafx.h"
 #include "ninja.h"
+#include "Settings.h"
 #include "ninjaDlg.h"
 #include "FrameDlg.h"
 #include "afxdialogex.h"
@@ -203,6 +204,23 @@ void PressMouse(HWND h, POINT p)
 	}
 }
 
+void DragMouse(HWND h, POINT p)
+{
+	HWND hc = ChildWindowFromPoint(h,p);	
+	if (hc!=h) {		
+		RECT r;
+		GetClientRect(hc,&r);
+
+		int x = (r.left+r.right) / 2;
+		int y = (r.top+r.bottom) / 2;
+
+		PostMessage(hc,WM_LBUTTONDOWN,MK_LBUTTON, x	| (y << 16));			
+
+		y -= (r.bottom - r.top);
+
+		PostMessage(hc,WM_LBUTTONUP,MK_LBUTTON, x	| (y << 16));
+	}
+}
 
 void SimulatePrefold(HWND h, int x, int y)
 {
@@ -259,15 +277,26 @@ void CheckForFold(HWND h, int x, int y)
 		p.y = (r.bottom * 725) / 768;		
 		HWND hfold = ChildWindowFromPointEx(h,p,CWP_SKIPINVISIBLE);
 
+		p.x = (r.right * (552+130)) / 1052;
+		p.y = (r.bottom * 725) / 768;		
+		HWND hcall = ChildWindowFromPointEx(h,p,CWP_SKIPINVISIBLE);
 		
 
 		if ((hc==hpre) || (hc==hfold)) {
 			Log("%x | %x %x",hc,hpre,hfold);
 			EnterCriticalSection(&tablesCriticalSection);
 			tables[h].folded = true;
+			tables[h].abtn = false;
 			LeaveCriticalSection(&tablesCriticalSection);
 			Log("Folded %x",h);
 		}
+		if (hc==hcall) {			
+			EnterCriticalSection(&tablesCriticalSection);
+			tables[h].abtn = false;
+			LeaveCriticalSection(&tablesCriticalSection);
+			Log("call %x",h);
+		}
+		
 	}	
 }
 
@@ -324,24 +353,12 @@ void CycleBets(HWND h, int delta)
 
 		int i;
 		EnterCriticalSection(&tablesCriticalSection);
-		if (tables[h].fast==-1) {
-			if (delta<0) 
-				tables[h].fast=1;
-			else
-				tables[h].fast=2;
-		}		
-		else {
-			if (delta<0) {
-				tables[h].fast--;
-				if (tables[h].fast<0)
-					tables[h].fast = 0;
-			}
-			else {
-				tables[h].fast++;
-				if (tables[h].fast>3)
-					tables[h].fast = 3;
-			}
-		}
+	
+		if (delta<0) 
+			tables[h].fast=1;
+		else
+			tables[h].fast=2;
+
 		i = tables[h].fast;
 		LeaveCriticalSection(&tablesCriticalSection);
 
@@ -396,12 +413,16 @@ void TranslateWheel(HWND h, int delta)
 		if (hfold==h  || hslider==h) 
 			return;
 		
-	
+//	000B162C
+		p.x = (r.right * 779) / 1052;
+		p.y = (r.bottom * 637) / 768;	
 
-		Log("Wheel %x, %d",h,delta);
+		Log("Wheel %x, %d",hslider,delta);
 
-		SendMessage(hslider,WM_SETFOCUS,(WPARAM)h,0);                     
-		SendMessage(hslider,WM_MOUSEWHEEL,delta,0);
+		PressMouse(h,p);
+
+//		SendMessage(hslider,WM_SETFOCUS,(WPARAM)h,0);                     
+//		SendMessage(hslider,WM_MOUSEWHEEL,delta,0);
 
 	}	
 }
@@ -414,16 +435,18 @@ __declspec(dllexport) LRESULT CALLBACK KeyboardEvent (int nCode, WPARAM wParam, 
 	MSLLHOOKSTRUCT * pMouseStruct = (MSLLHOOKSTRUCT *)lParam;
 
 	if (pMouseStruct != NULL) {
-		if (wParam==WM_RBUTTONUP) {
-			HWND h = GetForegroundWindow();
+		HWND h = WindowFromPoint(pMouseStruct->pt);
+		while (GetParent(h)!=HWND_DESKTOP)
+			h = GetParent(h);
+
+
+		if (wParam==WM_RBUTTONUP) {			
 			SimulatePrefold(h, pMouseStruct->pt.x, pMouseStruct->pt.y);
 		}		
-		if (wParam==WM_LBUTTONDOWN) {
-			HWND h = GetForegroundWindow();
+		if (wParam==WM_LBUTTONDOWN) {			
 			//CheckForRaise(h, pMouseStruct->pt.x, pMouseStruct->pt.y);
 		}
-		if (wParam==WM_LBUTTONUP) {
-			HWND h = GetForegroundWindow();
+		if (wParam==WM_LBUTTONUP) {			
 			CheckForFold(h, pMouseStruct->pt.x, pMouseStruct->pt.y);
 		}
 
@@ -431,8 +454,8 @@ __declspec(dllexport) LRESULT CALLBACK KeyboardEvent (int nCode, WPARAM wParam, 
 			HWND h = WindowFromPoint(pMouseStruct->pt);
 			while (GetParent(h)!=HWND_DESKTOP)
 				h = GetParent(h);
-			//CycleBets(h, GET_WHEEL_DELTA_WPARAM(pMouseStruct->mouseData));
-			TranslateWheel(h, GET_WHEEL_DELTA_WPARAM(pMouseStruct->mouseData));
+			CycleBets(h, GET_WHEEL_DELTA_WPARAM(pMouseStruct->mouseData));
+			//TranslateWheel(h, GET_WHEEL_DELTA_WPARAM(pMouseStruct->mouseData));
 		}
 	}
 	return CallNextHookEx(hMouseHook,nCode,wParam,lParam);
@@ -472,6 +495,48 @@ DWORD WINAPI MyMouseLogger(LPVOID lpParm)
 	return 0;
 }
 
+void ProcessDefaultButtons(HWND h)
+{
+	int i = Settings::DefaultPostflop;
+
+	if (i==0)
+		return;
+
+	POINT p;
+	RECT r;
+	GetClientRect(h,&r);	
+
+	p.x = (r.right * 552) / 1052;
+	p.y = (r.bottom * 725) / 768;		
+	HWND hfold = ChildWindowFromPointEx(h,p,CWP_SKIPINVISIBLE);
+
+	if (hfold==h)
+		return;
+
+	if (i==1)
+	{
+		p.x = (r.right * (674-78-78-78)) / 1052;
+		p.y = (r.bottom * 669) / 768;		
+	}
+	if (i==2)
+	{
+		p.x = (r.right * (674-78-78)) / 1052;
+		p.y = (r.bottom * 669) / 768;		
+	}
+	if (i==3)
+	{
+		p.x = (r.right * (674-78)) / 1052;
+		p.y = (r.bottom * 669) / 768;		
+	}
+	if (i==4)
+	{
+		p.x = (r.right * 674) / 1052;
+		p.y = (r.bottom * 669) / 768;		
+	}
+
+	PressMouse(h,p);	
+}
+
 
 void UpdateTableData(HWND h)
 {	
@@ -505,8 +570,8 @@ void UpdateTableData(HWND h)
 	::GetWindowRect(h, &mainRect);
 
 	bool play = tables[h].playing;	
-	tables[h].abtn = false;
-	tables[h].tbtn = false;
+	//tables[h].abtn = false;
+	//tables[h].tbtn = false;
 
 	if (play && tables[h].frame && tables[h].frame->m_hWnd!=0) {
 		tables[h].frame->SetTrackedWindow(h);
@@ -516,7 +581,6 @@ void UpdateTableData(HWND h)
 	int hash = HandHash(h);
 	if (hash!=tables[h].handNumHash) {
 		Log("New hand %x",h);
-		OnNewHand();
 		tables[h].handNumHash = hash;
 		tables[h].folded = false;
 		tables[h].fast = -1;
@@ -563,8 +627,11 @@ void UpdateTableData(HWND h)
 
 		POINT p;
 		p.x = (r.right * 552) / 1052;
-		p.y = (r.bottom * 725) / 768;		
+		p.y = (r.bottom * 725) / 768;	
+		bool abefore = tables[h].abtn;
 		tables[h].abtn =  IsWindowVisible(ChildWindowFromPointEx(h,p,0));
+		if (!abefore && tables[h].abtn)
+			ProcessDefaultButtons(h);
 
 		p;
 		p.x = (r.right * 858) / 1052;
@@ -605,6 +672,7 @@ HANDLE hThread2;
 
 DWORD WINAPI MyWindowWatcher(LPVOID lpParm)
 {
+	int tick = 0;
 	while (true) {
 
 		HWND h = 0;
@@ -628,6 +696,10 @@ DWORD WINAPI MyWindowWatcher(LPVOID lpParm)
 		LeaveCriticalSection(&tablesCriticalSection);
 
 		Sleep(300);
+
+		tick++;
+		if (tick % 30 == 0)
+			OnNewHand();
 	}
 
 	return 0;
